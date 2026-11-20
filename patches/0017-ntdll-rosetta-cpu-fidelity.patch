@@ -10,7 +10,7 @@
  
  /* CW Hack 23427 */
  static BOOL sequoia_or_later = FALSE;
-@@ -843,6 +846,10 @@
+@@ -883,6 +886,10 @@
          context->Dr3 = amd64_data->dr3;
          context->Dr6 = amd64_data->dr6;
          context->Dr7 = amd64_data->dr7;
@@ -21,20 +21,20 @@
      }
      else context->Dr7 = 0;
  
-@@ -994,6 +1001,12 @@
+@@ -1033,6 +1040,12 @@
+             return STATUS_BUFFER_OVERFLOW;
      }
      else flags &= ~CONTEXT_XSTATE;
- 
++
 +    if (flags & CONTEXT_DEBUG_REGISTERS)
 +        TRACE_(seh)( "debug registers: dr0=%p dr1=%p dr2=%p dr3=%p dr6=%#lx dr7=%#lx rip=%p eflags=%#x\n",
 +                     (void *)context->Dr0, (void *)context->Dr1, (void *)context->Dr2, (void *)context->Dr3,
 +                     (unsigned long)context->Dr6, (unsigned long)context->Dr7, (void *)context->Rip,
 +                     (unsigned int)context->EFlags );
-+
+ 
      /* debug registers require a server call */
      if (self && (flags & CONTEXT_DEBUG_REGISTERS))
-         self = (amd64_data->dr0 == context->Dr0 &&
-@@ -1026,6 +1039,12 @@
+@@ -1066,6 +1079,12 @@
          }
      }
  
@@ -47,7 +47,7 @@
      if (flags & CONTEXT_INTEGER)
      {
          frame->rax = context->Rax;
-@@ -1847,6 +1866,93 @@
+@@ -1887,6 +1906,93 @@
      }
      return FALSE;
  }
@@ -141,10 +141,13 @@
  #endif
  
  /***********************************************************************
-@@ -2310,6 +2416,270 @@
- }
- 
- 
+@@ -2347,9 +2453,273 @@
+     /* leave_handler() will set GSBASE to the TEB */
+ #endif
+     return TRUE;
++}
++
++
 +#ifdef __APPLE__
 +/* HRAVA_HW_EXEC_BREAKPOINT: stand-in for x86 execution breakpoints under Rosetta 2.
 + *
@@ -182,12 +185,12 @@
 +    }
 +    else if (InterlockedCompareExchange( &bp->guarded, 0, 1 ) == 1)
 +        mprotect( (void *)SW_BP_PAGE(bp->addr), 0x1000, bp->prot );
-+}
-+
+ }
+ 
 +static BOOL set_sw_stepping( HANDLE tid, BOOL step )
 +{
 +    unsigned int i;
-+
+ 
 +    for (i = 0; i < ARRAY_SIZE(sw_stepping); i++)
 +    {
 +        if (sw_stepping[i] != tid) continue;
@@ -412,7 +415,7 @@
  /**********************************************************************
   *		segv_handler
   *
-@@ -2324,6 +2694,11 @@
+@@ -2364,6 +2734,11 @@
  
      save_context( data, &context, sigcontext );
  
@@ -424,7 +427,7 @@
      switch(TRAP_sig(sigcontext))
      {
      case TRAP_x86_OFLOW:   /* Overflow exception */
-@@ -2336,6 +2711,10 @@
+@@ -2376,6 +2751,10 @@
  #ifdef __APPLE__
          /* CW HACK 23427 */
          if (emulate_xgetbv( sigcontext, &context.c )) return;
@@ -435,7 +438,7 @@
          /* CW HACK 27328, 25932, 27266 */
          if (emulate_nop( sigcontext, &context.c )) return;
  #endif
-@@ -2359,6 +2738,25 @@
+@@ -2399,6 +2778,25 @@
          }
          break;
      case TRAP_x86_PAGEFLT:  /* Page fault */
@@ -461,7 +464,7 @@
          rec.NumberParameters = 2;
          rec.ExceptionInformation[0] = (ERROR_sig(sigcontext) >> 1) & 0x09;
          rec.ExceptionInformation[1] = (ULONG_PTR)siginfo->si_addr;
-@@ -2421,6 +2819,10 @@
+@@ -2461,6 +2859,10 @@
  
      if (handle_syscall_trap( data, sigcontext, siginfo )) return;
  
@@ -472,7 +475,7 @@
      save_context( data, &context, sigcontext );
  
      switch (TRAP_sig(sigcontext))
-@@ -2431,6 +2833,10 @@
+@@ -2471,6 +2873,10 @@
          /* when single stepping can't tell whether this is a hw bp or a
           * single step interrupt. try to avoid as much overhead as possible
           * and only do a server call if there is any hw bp enabled. */
@@ -483,7 +486,7 @@
          if (!(context.c.EFlags & 0x100) || (context.c.Dr7 & 0xff))
          {
              /* (possible) hardware breakpoint, fetch the debug registers */
-@@ -2820,6 +3226,140 @@
+@@ -2860,6 +3266,140 @@
  }
  
  
@@ -624,7 +627,7 @@
  /**********************************************************************
   *           get_thread_ldt_entry
   */
-@@ -2974,6 +3514,7 @@
+@@ -3014,6 +3554,7 @@
          else
              is_rosetta2 = ret;
      }
